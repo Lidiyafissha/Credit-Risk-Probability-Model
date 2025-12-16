@@ -1,0 +1,9 @@
+# Docker will be used to set up a multi-container application with a web server and a database. version: "3.8"
+
+services:
+  credit-risk-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://host.docker.internal:5000
