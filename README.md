@@ -1,56 +1,197 @@
-# Credit Scoring Business Understanding
+# Credit-Risk-Probability-Model
 
-Credit Scoring Business Understanding
-This document provides a comprehensive analysis of the credit risk modeling environment, covering regulatory influences, data constraints, and model trade-offs. It concludes with the foundational Credit Scoring Business Understanding and the required structure for the project's codebase, ensuring alignment with best practices and regulatory scrutiny (e.g., SR 11-7).
+## Credit Scoring Business Understannding
 
-I. Credit Scoring Business Understanding and Objectives
-This section defines the core purpose of the credit risk model and its application within the financial institution.
+### 1. Basel II's Emphasis on Risk Measurement and Model Requirements
 
-The primary objective is the robust estimation of the Probability of Default (PD) for specific loan segments, such as Micro, Small, and Medium Enterprises (MSMEs). The model's intended use is twofold: Regulatory Compliance (providing essential parameters for capital calculation under the Internal Ratings Based, or IRB, approach) and Strategic Decision-Making (informing loan pricing, underwriting policies, and credit limit setting).
+#### 1.1. The Link Between Basel II and Model Interpretability/Documentation
 
-Due to the common constraint of limited historical default data in new or emerging markets, the target variable used in modeling is defined as a necessary proxy: Delinquency of Service Charge Payments (e.g., 90+ days past due). This selection, while tactical, is justified as a strong leading indicator of financial distress that precedes true loan default, allowing for near-term predictive capability essential for immediate business operations.
+The Basel II Accord (specifically under the **Internal Ratings-Based (IRB) approach**) requires banks to use their own models to estimate key risk parameters like Probability of Default (**PD**), Loss Given Default (**LGD**), and Exposure at Default (**EAD**). These models directly determine the bank's minimum regulatory capital requirement.
 
-II. Regulatory Influence and Interpretability
-The Basel II Accord mandated a shift towards integrating institutions’ internal risk measurements, requiring high levels of transparency and documentation.
+This direct link to capital dictates two strict requirements:
 
-Regulatory Mandates
-The move to the IRB approach forced Credit Services Providers (CSPs) to generate internal estimates for risk parameters like PD. This necessity drove the expansion of Model Governance frameworks. Subsequent guidance, notably SR 11-7, formalized the expectation that scrutiny must cover the entire end-to-end model life cycle, requiring robust controls from development through ongoing usage.
+* **Requirement for Interpretability:** Regulators (**Pillar 2: Supervisory Review**) must validate and approve the bank's internal capital assessment process. A model whose logic cannot be easily explained (a "black box") is almost impossible to approve. The bank's management also needs to understand the risk drivers to make informed lending and provisioning decisions. The coefficients and variable effects must have clear economic reasoning.
+* **Requirement for Well-Documentation:** Extensive documentation is mandatory (**Pillar 2 and Pillar 3: Market Discipline**). This covers the model development process, data sources, performance, ongoing monitoring, and governance. This documentation ensures transparency for supervisors and demonstrates that the bank is following sound risk management practices.
 
-Interpretability and the Black Box Problem
-Regulatory requirements stipulate that all credit decisions must be explainable, transparent, and fair. This leads to a fundamental trade-off:
+---
 
-Simple Models (e.g., Logistic Regression): These are easily validated and interpreted, offering clear feature-to-outcome relationships that align well with compliance needs.
+### 2. The Necessity and Risks of Using a Proxy Variable for "Default"
 
-Complex Models (e.g., Gradient Boosting): While offering superior predictive strength and accuracy, they suffer from the "black box" problem. Their intricate logic makes establishing a clear causal link challenging, posing a major barrier to regulatory acceptance and making specific credit decisions difficult to explain to customers or auditors.
+#### 2.1. Why a Proxy Variable is Necessary
 
-III. Data Constraints and Business Risks
-The tactical use of proxy variables introduces specific limitations and risks that must be acknowledged.
+In credit risk modeling, the true event of regulatory default (e.g., legal charge-off or bankruptcy) may be too sparse, take too long to materialize, or be inconsistently defined across different portfolios.
 
-The most significant operational risk is the Prediction Horizon Limitation. Models built on short-term proxies (like delinquency) are primarily effective for near-term forecasting. The predictive capability demonstrably decays over time (e.g., predicting beyond one or two months), limiting their strategic value. Furthermore, the application of innovative algorithms to novel data sources heightens the risk of overfitting, where the model corresponds too closely to the specific training data noise rather than real-world patterns.
+A **proxy variable**—or a **Performance/Default Event Definition**—is created to define the target variable (e.g., $Y=1$ for a "bad" account) based on an earlier, more common, and observable signal of financial distress within a specific window. A common definition might be: "An account is defined as 'bad' if it has been **90 days Past Due (DPD)** or more at any point in the next 12 months."
 
-IV. Code Implementation Quality and Regulatory Alignment
-Addressing the feedback on inspectable source code, the project structure is designed for maximum clarity, robustness, and auditability, aligning with SR 11-7 model governance principles.
+This proxy is essential because it allows for:
 
-End-to-End Credit Risk Pipeline Overview
-The project follows a rigorous, modular pipeline , ensuring clean separation of concerns:
+* **Sufficient Sample Size:** Generating enough 'bad' observations to train a statistically robust model.
+* **Timely Prediction:** Providing an earlier warning signal for risk management interventions and required provisioning *before* the costly true default occurs.
 
-Data Ingestion and Processing: Handled by dedicated functions within src/data_processing.py.
+#### 2.2. Potential Business Risks of Predictions Based on a Proxy
 
-Feature Engineering: Managed in src/feature_engineering.py for reproducible transformations.
+The main risk stems from the potential mismatch between the predicted **proxy event** and the actual **true regulatory default**.
 
-Model Training and Selection: Code resides in src/modeling.py, where both simple and complex algorithms are evaluated before final selection.
+1.  **Proxy Mismatch (Over-Provisioning):** The model accurately predicts the proxy event (e.g., 90 DPD), but the borrower subsequently cures and **never** reaches true regulatory default. This leads to classifying accounts as risky that ultimately perform, resulting in unnecessarily high loan loss provisions and capital charges, which harms profitability.
+2.  **Model Calibration Risk (Regulatory Non-Compliance):** The statistical model is trained to predict $\text{PD}_{\text{proxy}}$. Basel II, however, requires the final PD to be calibrated to the long-run average of the **true regulatory default rate ($\text{PD}_{\text{Basel}}$)**. If the bank fails to properly adjust or scale the model's output to the true definition, the Risk-Weighted Assets (RWA) calculation will be incorrect, risking regulatory sanctions.
 
-Validation and Reporting: Metrics (e.g., AUC, KS) are calculated and reported via src/evaluation.py.
+---
 
-Deployment/Scoring: The final model is wrapped and exposed via a dedicated API located in src/api/.
+### 3. Trade-offs: Simple vs. Complex Models in a Regulated Context
 
-Code Robustness and Best Practices
-To provide verifiable evidence of code quality, the following practices are strictly enforced across the source code:
+In a Basel II environment, the choice between a simple, interpretable model (like Logistic Regression with Weight of Evidence, or WoE) and a complex, high-performance model (like Gradient Boosting) is a crucial trade-off between **Regulatory Compliance** and **Predictive Accuracy**.
 
-Modular Design: Code is split into logical modules for high testability and maintenance.
+#### Simple/Interpretable Models (Logistic Regression/WoE)
 
-Explicit Error Handling: All critical functions—especially those involving data loading, complex financial calculations, and API endpoints—are protected by try...except blocks. This ensures the pipeline fails gracefully and securely, rather than crashing on unexpected input or external failures.
+**Trade-Off Advantages:**
 
-Auditable Logging: The standard Python logging module is used throughout the pipeline (replacing simple print statements). This produces a traceable, auditable execution record, which is mandatory for demonstrating control and governance over the model's performance and deployment history.
+* **High Interpretability:** The linear relationship and monotonic effects from WoE transformation make the model easy to validate, audit, and explain to regulators and internal stakeholders. This directly addresses the core **Pillar 2** requirements.
+* **Stability & Auditability:** The model is stable, and changes in input variables result in predictable changes in output. This makes model monitoring straightforward and reduces the risk of regulatory rejection.
+* **Ease of Deployment:** Widely understood and easier to implement in traditional banking IT systems.
 
-Inspectable Code: Comprehensive Docstrings and Type Hinting are used for all functions, making the implementation quality clear and readily inspectable by validators and reviewers.
+**Trade-Off Disadvantages:**
+
+* **Lower Predictive Performance:** These models are less capable of capturing complex non-linear relationships and interactions, potentially leading to less accurate PD estimates and, consequently, inefficient capital allocation (higher RWA than necessary).
+* **Requires Extensive Feature Engineering:** Requires manual binning and WoE calculation, which consumes time and may lead to information loss.
+
+#### Complex/High-Performance Models (Gradient Boosting)
+
+**Trade-Off Advantages:**
+
+* **Superior Predictive Performance:** Captures complex data structures, leading to more precise PD estimation. Higher accuracy can translate into more efficient capital use, potentially leading to a lower (but more accurate) RWA.
+* **Less Feature Engineering:** Can automatically discover and exploit high-order feature interactions.
+
+**Trade-Off Disadvantages:**
+
+* **"Black Box" Nature (High Regulatory Risk):** It is extremely difficult to explain *why* a specific complex prediction was made. This opacity is a significant barrier to **Pillar 2** approval, as regulators may reject the model due to a lack of causal clarity.
+* **Difficult to Audit and Monitor:** Complex models are more prone to overfitting and can be unstable. Monitoring for parameter drift and ensuring the economic logic remains sound is much harder, increasing operational and model risk.
+
+**The Contextual Decision:**
+
+In practice, simple, interpretable models are often mandated for **Regulatory Capital (Pillar 1)** because they minimize the risk of regulatory rejection. Complex models are increasingly used for **internal "Economic Capital" models** or for **operational decisions** (like optimizing collections strategy), where high accuracy is valued over regulatory-grade transparency. Using a complex model for regulatory capital requires exhaustive, sophisticated, and often *post-hoc* explainability techniques (like SHAP or LIME) to satisfy the high burden of proof for interpretability.
+
+---
+
+## Task 3 — Feature Engineering (Customer-Level Features)
+
+The feature engineering process transforms raw transaction-level data into **customer-level features** suitable for predictive modeling. Key steps include:
+
+1. **Customer Aggregation**:
+
+   * Summarizes transactions at the customer level.
+   * Example features:
+
+     * `Total_Transaction_Amount`
+     * `Average_Transaction_Amount`
+     * `Transaction_Count`
+     * `Transaction_Recency`
+     * `Night_Transactions`
+     * `Dormant_Flag`
+
+2. **Feature Engineering**:
+
+   * Compute derived features such as:
+
+     * `Avg_Amount_By_Category`
+     * `Count_By_FraudResult`
+     * `Night_Txn_Ratio`
+     * `Amount_CV` (coefficient of variation)
+     * `Log_Total_Amount`
+
+3. **Missing Value Handling**:
+
+   * Numeric features: imputed using median.
+   * Categorical features: imputed using most frequent value.
+
+4. **Binning & Encoding**:
+
+   * Continuous features are discretized using quantile binning.
+   * Categorical features are transformed using Weight-of-Evidence (WoE) encoding for interpretability.
+
+5. **Modular Pipeline Implementation**:
+
+   * All transformations are implemented in `src/data_processing.py` and wrapped in a scikit-learn `Pipeline`.
+   * This ensures reproducibility, easy experimentation, and proper integration with downstream model training.
+
+**Example Usage**:
+
+```python
+from src.data_processing import create_feature_pipeline
+
+# Load raw data
+df = pd.read_csv("data/raw/data.csv")
+
+# Build feature pipeline
+feature_pipeline = create_feature_pipeline(df)
+X = feature_pipeline.fit_transform(df)
+```
+
+---
+
+## Task 4 — Proxy Target Variable Engineering
+
+Regulatory default events are rare or delayed, requiring a **proxy target** for supervised learning.
+
+1. **RFM Clustering**:
+
+   * Customers are clustered based on **Recency, Frequency, and Monetary (RFM)** behavior.
+   * K-Means clustering identifies high-risk segments.
+
+2. **Proxy Target Definition**:
+
+   * `is_high_risk` is set to 1 for customers in clusters representing high default likelihood.
+   * This target is merged with the customer-level features for model training.
+
+**Example Usage**:
+
+```python
+from src.data_processing import create_proxy_target
+
+proxy_target, cluster_summary = create_proxy_target(df)
+y = proxy_target["is_high_risk"]
+```
+
+---
+
+## Task 5 — Model Training and Experiment Tracking
+
+1. **Train/Test Split**:
+
+   * Split customer-level features (`X`) and target (`y`) into training and testing sets using stratification to preserve class distribution.
+
+```python
+from src.train import split_data
+X_train, X_test, y_train, y_test = split_data(X, y, test_size=0.2, random_state=42)
+```
+
+2. **Model Selection**:
+
+   * Logistic Regression (interpretable, regulatory-friendly).
+   * Decision Tree (handles non-linearities).
+
+3. **Training & MLflow Logging**:
+
+   * Each model is trained and evaluated with metrics: `accuracy`, `precision`, `recall`, `f1`.
+   * MLflow automatically logs parameters, metrics, and model artifacts for experiment tracking.
+
+```python
+from src.train import train_logistic_regression, train_decision_tree
+
+lr_model, lr_metrics = train_logistic_regression(X_train, y_train, X_test, y_test)
+dt_model, dt_metrics = train_decision_tree(X_train, y_train, X_test, y_test)
+```
+
+4. **Best Model Selection**:
+
+   * The model with the highest F1 score (or another chosen metric) is selected.
+   * Registered in the MLflow Model Registry for deployment.
+
+```python
+from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+best_run = max(runs, key=lambda r: r.data.metrics["f1"])
+mlflow.register_model(model_uri=f"runs:/{best_run.info.run_id}/model", name="Credit_Risk_Model")
+```
+
+---
