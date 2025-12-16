@@ -102,9 +102,6 @@ def train_decision_tree(X_train, y_train, X_test, y_test):
 
         return model, metrics
 
-# mlflow.register_model(
-#     model_uri="runs:/<RUN_ID>/model",
-#     name="Credit_Risk_Model"
-# )
+
 
 
